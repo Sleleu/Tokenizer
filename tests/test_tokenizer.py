@@ -6,7 +6,7 @@ def tokenizer():
     return Tokenizer()
 
 @pytest.mark.parametrize(
-    "ids, pair, new_id, expected",
+    "ids, best_pair, new_id, expected",
     [
         ([1, 2, 3, 4, 1, 2, 5], (1, 2), 42, [42, 3, 4, 42, 5]),
         ([1, 2, 3, 4, 1, 2], (1, 2), 42, [42, 3, 4, 42]),
@@ -18,9 +18,9 @@ def tokenizer():
 def test_merge(
     tokenizer: Tokenizer,
     ids: list[int],
-    pair: tuple[int, int],
+    best_pair: tuple[int, int],
     new_id: int,
     expected: list[int],
 ):
-    result = tokenizer.merge(ids, pair, new_id)
+    result = tokenizer.merge(ids, best_pair, new_id)
     assert result == expected

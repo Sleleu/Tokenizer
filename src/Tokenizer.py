@@ -5,49 +5,52 @@ class Tokenizer:
         self.vocab_size = None
 
     def train(self, text, vocab_size):
+        print("Begin training phase")
         encoded_text = self.encode(text)
 
         # load char in vocab
-        # self.vocab = {i : chr(i) for i in range(32, 127)}
-        # print(self.vocab)
-
-        self.byte_pair_encoding(text, 500, 3)
-
-    def byte_pair_encoding(self, text, vocab_size, num_merge: int):
+        self.vocab = {i: bytes([i]) for i in range(256)}
+        print(self.vocab)
 
         # convert text into raw bytes string
         encoded_text = text.encode("utf-8", errors="replace")
 
         # convert raw bytes string to a list of integers
         tokens = list(map(int, encoded_text))
+        tokens_initial_len = len(tokens)
+        num_merge = 3
 
-        print(f"Text length: {len(text)} | Token list length : {len(tokens)}")
-        print("tokens:", tokens)
+        for _ in range(num_merge):
+            best_pair = self.get_best_pair(tokens)
 
-        for merge in range(num_merge):
-            # Get number of occurences for each pair
-            occurences = {}
-            for i in zip(tokens, tokens[1:]):
-                occurences[i] = occurences.get(i, 0) + 1
-            print("occurences:", occurences)
+            id = len(self.vocab)
+            if best_pair not in self.vocab.values():
+                self.vocab[id] = self.vocab[best_pair[0]] + self.vocab[best_pair[1]]
+                print(f"New token added in vocabulary, id: {id} | token: {best_pair}")
 
-            # Get the top pair (max occurences value)
-            top_pair = max(occurences, key=lambda k: occurences[k])
-            print("top_pair:", top_pair)
+            tokens = self.merge(tokens, best_pair, id)
+            # print(self.vocab)
 
-            new_ids = self.merge(tokens, top_pair, 255 + merge)
-            tokens = new_ids
-            for i in tokens:
-                print(chr(i), end="")
-            print()
-            for i in new_ids:
-                print(chr(i), end="")
-            print()
+            # self.byte_pair_encoding(text, 3)
+        print("initial token length:", tokens_initial_len)
+        print("after merge:", len(tokens))
+        print("compression ratio:", tokens_initial_len / len(tokens))
 
-            idx = 256 + merge
-            self.vocab[top_pair] = idx
+        print(self.vocab)
+        print("Training complete")
 
-    def merge(self, ids: list, top_pair: tuple, new_id: int):
+    def get_best_pair(self, tokens: list[int]) -> tuple[int, int]:
+        # Get number of occurences for each pair
+        occurences = {}
+        for i in zip(tokens, tokens[1:]):
+            occurences[i] = occurences.get(i, 0) + 1
+
+        # Get the best pair (max occurences value)
+        best_pair = max(occurences, key=lambda k: occurences[k])
+
+        return best_pair
+
+    def merge(self, ids: list, best_pair: tuple, new_id: int):
         if not ids:
             return []
 
@@ -57,7 +60,7 @@ class Tokenizer:
             if added_pair:
                 added_pair = False
                 continue
-            if pair == top_pair:
+            if pair == best_pair:
                 new_ids.append(new_id)
                 added_pair = True
             else:
@@ -71,5 +74,5 @@ class Tokenizer:
     def encode(self, text):
         return text.encode("utf-8")
 
-    def decode(self, ids):
-        pass
+    def decode(self, ids: list[int]):
+        return b"".join(self.vocab[i] for i in ids).decode("utf-8", errors="replace")
