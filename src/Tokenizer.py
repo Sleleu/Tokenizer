@@ -3,10 +3,11 @@ class Tokenizer:
     def __init__(self, vocab={}):
         self.vocab: dict = vocab
         self.vocab_size = None
+        self.merges = {} # TODO: review merges/vocab interactions in encode/decode
 
     def train(self, text, vocab_size):
         print("Begin training phase")
-        encoded_text = self.encode(text)
+        encoded_text = text.encode("utf-8")
 
         # load char in vocab
         self.vocab = {i: bytes([i]) for i in range(256)}
@@ -24,6 +25,7 @@ class Tokenizer:
             best_pair = self.get_best_pair(tokens)
 
             id = len(self.vocab)
+            self.merges[best_pair] = id
             if best_pair not in self.vocab.values():
                 self.vocab[id] = self.vocab[best_pair[0]] + self.vocab[best_pair[1]]
                 print(f"New token added in vocabulary, id: {id} | token: {best_pair}")
@@ -71,8 +73,35 @@ class Tokenizer:
             new_ids.append(ids[-1])
         return new_ids
 
-    def encode(self, text):
-        return text.encode("utf-8")
+    def encode(self, text) -> list[int]:
+        # encode text in utf-8
+        utf_encoded_text = text.encode("utf-8")
+        
+        tokens = []
+        
+        # reverse keys and values to search with bytes
+        reverse_vocab = {v:k for (k, v) in self.vocab.items()}
+        concat_bytes = b''
+        
+        for i in utf_encoded_text:
+            i = bytes([i])
+            concat_bytes += i
+            
+            # update the last token if the concatenated bytes form a key in reverse_vocab
+            if  len(concat_bytes) > 1 and concat_bytes in reverse_vocab:
+                tokens[-1] = reverse_vocab[concat_bytes]
+                continue
+            
+            # if concatenated bytes aren't in the vocabulary, add a new token
+            if i in reverse_vocab:
+                tokens.append(reverse_vocab[i])
+                
+                # to prevent skipping the first concatenated byte
+                if len(concat_bytes) > 1:
+                    # reset concat_byte to searck new token
+                    concat_bytes = b''
+        return tokens
 
-    def decode(self, ids: list[int]):
+    def decode(self, ids: list[int]) -> str:
+        print("DECODE FUNCTION")
         return b"".join(self.vocab[i] for i in ids).decode("utf-8", errors="replace")
