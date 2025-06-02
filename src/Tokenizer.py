@@ -1,36 +1,56 @@
+import regex as re
+
 class Tokenizer:
 
-    def __init__(self, vocab={}):
+    def __init__(self, vocab={}, pattern=None):
         self.vocab: dict = vocab
         self.vocab_size = None
         self.merges = {}
         self.special_token_ids = []
+        if pattern is None:
+            # gpt-4 pattern
+            self.pattern = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
+        else:
+            self.pattern = pattern
+        self.compiled_pattern = re.compile(self.pattern)
 
     def train(self, text=None, filepath=None, merge_nb=500):
         # load char in vocab
         self.vocab = {i: bytes([i]) for i in range(256)}
 
         if filepath: 
-            print("FILEPATH EXIST")
             with open(filepath) as file:
                 text = file.read()
-        encoded_text = text.encode("utf-8")
-        tokens = list(map(int, encoded_text))
-        # tokens_initial_len = len(tokens)
+        
+        if self.pattern is None:
+            encoded_text = text.encode("utf-8")
+            tokens = [list(map(int, encoded_text))]
+        else:
+            text_chunks = re.findall(self.compiled_pattern, text)
+            tokens = [list(chunk.encode("utf-8")) for chunk in text_chunks]
 
-        for _ in range(merge_nb):
-            occurences = self.find_occurences(tokens)
+
+        for i in range(merge_nb):
+            if i % (merge_nb / 100) == 0:
+                print(f"Merge {i} / {merge_nb}")
+
+            occurences = {}
+            for chunk_token in tokens:   
+                self.find_occurences(chunk_token, occurences)
             if not occurences:
                 break # no occurences left
+            #print(occurences)
             best_pair = self.get_best_pair(occurences)
-
-            id = len(self.vocab)
+            #print(occurences)
+            #print(best_pair)
+            id = 256 + i
             self.merges[best_pair] = id
             if best_pair not in self.vocab.values():
                 self.vocab[id] = self.vocab[best_pair[0]] + self.vocab[best_pair[1]]
-                print(f"New token added in vocabulary, id: {id} | token: {best_pair}")
+                    #print(f"New token added in vocabulary, id: {id} | token: {best_pair}")
 
-            tokens = self.merge(tokens, best_pair, id)
+            tokens = [self.merge(token_chunk, best_pair, id) for token_chunk in tokens]
+            #print(self.vocab)
 
         # print("initial token length:", tokens_initial_len)
         # print("after merge:", len(tokens))
@@ -45,9 +65,9 @@ class Tokenizer:
 
         print("Training complete")
 
-    def find_occurences(self, tokens: list[int]) -> dict[tuple, int]:
+    def find_occurences(self, tokens: list[int], occurences: dict) -> dict[tuple[int, int], int]:
         # Get number of occurences for each pair
-        occurences = {}
+        # occurences = {}
         for i in zip(tokens, tokens[1:]):
             occurences[i] = occurences.get(i, 0) + 1
         return occurences
@@ -98,7 +118,6 @@ class Tokenizer:
                 idx += 1
         # index() return value error if no '<' is found in text
         except ValueError:
-            print("'<' not found in text")
             pass # not an error, pass
         return tokens
 
@@ -110,7 +129,7 @@ class Tokenizer:
 
         while True:
             # map pair keys
-            stats = self.find_occurences(tokens)
+            stats = self.find_occurences(tokens, occurences={})
             if not stats: # no merge left
                 break
             pair = min(stats, key=lambda k: self.merges.get(k, float("inf")))
