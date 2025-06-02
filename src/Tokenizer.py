@@ -36,9 +36,12 @@ class Tokenizer:
         # print("after merge:", len(tokens))
         # print("compression ratio:", tokens_initial_len / len(tokens))
         
-
-        self.special_token_ids.append(len(self.vocab))
-        self.vocab[len(self.vocab)] = b"<|endoftext|>"
+        special_tokens = (b'<|endoftext|>',
+                          b'<|im_start|>',
+                          b'<|im_end|>')
+        for special_token in special_tokens:
+            self.special_token_ids.append(len(self.vocab))
+            self.vocab[len(self.vocab)] = special_token
 
         print("Training complete")
 
@@ -76,20 +79,27 @@ class Tokenizer:
         return new_ids
 
     def encode_special_tokens(self, tokens: list[int]) -> list[int]:
-        # only have one special token actually
-        # TODO: working function with multiple special tokens
-        special_token_id = self.special_token_ids[0]
-        tokens_to_replace = list(self.vocab.get(special_token_id))
+        special_tok_ids = self.special_token_ids
+        tok_to_replace = []
+
+        # gather all list[bytes] of special tokens by id
+        for i in special_tok_ids:
+            tok_to_replace.append(list(self.vocab[i]))
 
         try:
             idx = 0
             while idx <= len(tokens):
-                idx = tokens.index(tokens_to_replace[0], idx)
-                if tokens[idx : idx + len(tokens_to_replace)] == tokens_to_replace:
-                    tokens[idx : idx + len(tokens_to_replace)] = [special_token_id]
+                idx = tokens.index(60, idx) # search '<'
+                # for each '<' found, check if next bytes match with any special token
+                for i, special_tok_id in enumerate(special_tok_ids):
+                    if tokens[idx : idx + len(tok_to_replace[i])] == tok_to_replace[i]:
+                        tokens[idx : idx + len(tok_to_replace[i])] = [special_tok_id]
+                        break
                 idx += 1
+        # index() return value error if no '<' is found in text
         except ValueError:
-            pass
+            print("'<' not found in text")
+            pass # not an error, pass
         return tokens
 
 
