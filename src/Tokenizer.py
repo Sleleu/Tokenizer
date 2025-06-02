@@ -3,26 +3,25 @@ class Tokenizer:
     def __init__(self, vocab={}):
         self.vocab: dict = vocab
         self.vocab_size = None
-        self.merges = {} # TODO: review merges/vocab interactions in encode/decode
+        self.merges = {}
 
-    def train(self, text, vocab_size):
-        print("Begin training phase")
-        encoded_text = text.encode("utf-8")
-
+    def train(self, text=None, filepath=None, merge_nb=500):
         # load char in vocab
         self.vocab = {i: bytes([i]) for i in range(256)}
-        print(self.vocab)
 
-        # convert text into raw bytes string
-        encoded_text = text.encode("utf-8", errors="replace")
-
-        # convert raw bytes string to a list of integers
+        if filepath: 
+            print("FILEPATH EXIST")
+            with open(filepath) as file:
+                text = file.read()
+        encoded_text = text.encode("utf-8")
         tokens = list(map(int, encoded_text))
-        tokens_initial_len = len(tokens)
-        num_merge = 3
+        # tokens_initial_len = len(tokens)
 
-        for _ in range(num_merge):
-            best_pair = self.get_best_pair(tokens)
+        for _ in range(merge_nb):
+            occurences = self.find_occurences(tokens)
+            if not occurences:
+                break # no occurences left
+            best_pair = self.get_best_pair(occurences)
 
             id = len(self.vocab)
             self.merges[best_pair] = id
@@ -31,28 +30,26 @@ class Tokenizer:
                 print(f"New token added in vocabulary, id: {id} | token: {best_pair}")
 
             tokens = self.merge(tokens, best_pair, id)
-            # print(self.vocab)
 
-            # self.byte_pair_encoding(text, 3)
-        print("initial token length:", tokens_initial_len)
-        print("after merge:", len(tokens))
-        print("compression ratio:", tokens_initial_len / len(tokens))
+        # print("initial token length:", tokens_initial_len)
+        # print("after merge:", len(tokens))
+        # print("compression ratio:", tokens_initial_len / len(tokens))
 
-        print(self.vocab)
         print("Training complete")
 
-    def get_best_pair(self, tokens: list[int]) -> tuple[int, int]:
+    def find_occurences(self, tokens: list[int]) -> dict[tuple, int]:
         # Get number of occurences for each pair
         occurences = {}
         for i in zip(tokens, tokens[1:]):
             occurences[i] = occurences.get(i, 0) + 1
+        return occurences
 
+    def get_best_pair(self, occurences: dict[tuple, int]) -> tuple[int, int]:
         # Get the best pair (max occurences value)
         best_pair = max(occurences, key=lambda k: occurences[k])
-
         return best_pair
 
-    def merge(self, ids: list, best_pair: tuple, new_id: int):
+    def merge(self, ids: list, best_pair: tuple, new_id: int) -> list[int]:
         if not ids:
             return []
 
@@ -72,36 +69,20 @@ class Tokenizer:
         if not added_pair:
             new_ids.append(ids[-1])
         return new_ids
-
+    
     def encode(self, text) -> list[int]:
-        # encode text in utf-8
-        utf_encoded_text = text.encode("utf-8")
-        
-        tokens = []
-        
-        # reverse keys and values to search with bytes
-        reverse_vocab = {v:k for (k, v) in self.vocab.items()}
-        concat_bytes = b''
-        
-        for i in utf_encoded_text:
-            i = bytes([i])
-            concat_bytes += i
-            
-            # update the last token if the concatenated bytes form a key in reverse_vocab
-            if  len(concat_bytes) > 1 and concat_bytes in reverse_vocab:
-                tokens[-1] = reverse_vocab[concat_bytes]
-                continue
-            
-            # if concatenated bytes aren't in the vocabulary, add a new token
-            if i in reverse_vocab:
-                tokens.append(reverse_vocab[i])
-                
-                # to prevent skipping the first concatenated byte
-                if len(concat_bytes) > 1:
-                    # reset concat_byte to searck new token
-                    concat_bytes = b''
+        tokens = list(text.encode("utf-8"))
+        while True:
+            # map pair keys
+            stats = self.find_occurences(tokens)
+            if not stats: # no merge left
+                break
+            pair = min(stats, key=lambda k: self.merges.get(k, float("inf")))
+            if pair not in self.merges: # no merge left
+                break
+            idx = self.merges[pair]
+            tokens = self.merge(tokens, pair, idx)
         return tokens
 
     def decode(self, ids: list[int]) -> str:
-        print("DECODE FUNCTION")
         return b"".join(self.vocab[i] for i in ids).decode("utf-8", errors="replace")
