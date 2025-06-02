@@ -4,6 +4,7 @@ class Tokenizer:
         self.vocab: dict = vocab
         self.vocab_size = None
         self.merges = {}
+        self.special_token_ids = []
 
     def train(self, text=None, filepath=None, merge_nb=500):
         # load char in vocab
@@ -34,6 +35,10 @@ class Tokenizer:
         # print("initial token length:", tokens_initial_len)
         # print("after merge:", len(tokens))
         # print("compression ratio:", tokens_initial_len / len(tokens))
+        
+
+        self.special_token_ids.append(len(self.vocab))
+        self.vocab[len(self.vocab)] = b"<|endoftext|>"
 
         print("Training complete")
 
@@ -69,9 +74,30 @@ class Tokenizer:
         if not added_pair:
             new_ids.append(ids[-1])
         return new_ids
-    
+
+    def encode_special_tokens(self, tokens: list[int]) -> list[int]:
+        # only have one special token actually
+        # TODO: working function with multiple special tokens
+        special_token_id = self.special_token_ids[0]
+        tokens_to_replace = list(self.vocab.get(special_token_id))
+
+        try:
+            idx = 0
+            while idx <= len(tokens):
+                idx = tokens.index(tokens_to_replace[0], idx)
+                if tokens[idx : idx + len(tokens_to_replace)] == tokens_to_replace:
+                    tokens[idx : idx + len(tokens_to_replace)] = [special_token_id]
+                idx += 1
+        except ValueError:
+            pass
+        return tokens
+
+
+
     def encode(self, text) -> list[int]:
         tokens = list(text.encode("utf-8"))
+        tokens = self.encode_special_tokens(tokens)
+
         while True:
             # map pair keys
             stats = self.find_occurences(tokens)
