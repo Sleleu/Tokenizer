@@ -1,10 +1,6 @@
 import pytest
 from src.Tokenizer import Tokenizer
 
-# @pytest.fixture
-# def tokenizer():
-#     return Tokenizer()
-
 @pytest.mark.parametrize(
     "ids, best_pair, new_id, expected",
     [

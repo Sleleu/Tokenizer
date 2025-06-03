@@ -1,4 +1,6 @@
 import regex as re
+import os
+from src.DataManager import DataManager
 
 class Tokenizer:
 
@@ -14,13 +16,12 @@ class Tokenizer:
             self.pattern = pattern
         self.compiled_pattern = re.compile(self.pattern)
 
-    def train(self, text=None, filepath=None, merge_nb=500):
+    def train(self, text=None, path=None, merge_nb=500):
         # load char in vocab
         self.vocab = {i: bytes([i]) for i in range(256)}
 
-        if filepath: 
-            with open(filepath) as file:
-                text = file.read()
+        if path: 
+            text = DataManager.load(path)
         
         if self.pattern is None:
             encoded_text = text.encode("utf-8")
@@ -31,7 +32,7 @@ class Tokenizer:
 
 
         for i in range(merge_nb):
-            if i % (merge_nb / 100) == 0:
+            if i % (merge_nb / 10000) == 0:
                 print(f"Merge {i} / {merge_nb}")
 
             occurences = {}
@@ -39,10 +40,7 @@ class Tokenizer:
                 self.find_occurences(chunk_token, occurences)
             if not occurences:
                 break # no occurences left
-            #print(occurences)
             best_pair = self.get_best_pair(occurences)
-            #print(occurences)
-            #print(best_pair)
             id = 256 + i
             self.merges[best_pair] = id
             if best_pair not in self.vocab.values():
@@ -50,11 +48,6 @@ class Tokenizer:
                     #print(f"New token added in vocabulary, id: {id} | token: {best_pair}")
 
             tokens = [self.merge(token_chunk, best_pair, id) for token_chunk in tokens]
-            #print(self.vocab)
-
-        # print("initial token length:", tokens_initial_len)
-        # print("after merge:", len(tokens))
-        # print("compression ratio:", tokens_initial_len / len(tokens))
         
         special_tokens = (b'<|endoftext|>',
                           b'<|im_start|>',
@@ -67,7 +60,6 @@ class Tokenizer:
 
     def find_occurences(self, tokens: list[int], occurences: dict) -> dict[tuple[int, int], int]:
         # Get number of occurences for each pair
-        # occurences = {}
         for i in zip(tokens, tokens[1:]):
             occurences[i] = occurences.get(i, 0) + 1
         return occurences
@@ -141,3 +133,27 @@ class Tokenizer:
 
     def decode(self, ids: list[int]) -> str:
         return b"".join(self.vocab[i] for i in ids).decode("utf-8", errors="replace")
+    
+    def save(self, folderpath: str) -> None:
+
+        # take tail path to add a vocab/merges name
+        last_folder_path = os.path.split(folderpath)[1]
+        vocab_name = last_folder_path + "_vocab.txt"
+        merges_name = last_folder_path + "_merges.txt"
+        special_tok_ids_name = last_folder_path + "_special_tokens_ids.txt"
+
+        DataManager.vocab_save(self.vocab, folderpath, vocab_name)
+        DataManager.merges_save(self.merges, folderpath, merges_name)
+        DataManager.special_tok_ids_save(self.special_token_ids, folderpath, special_tok_ids_name)
+
+    def get_encoding(self, folderpath: str) -> None:
+        """
+        Given a folder path, load these elements in `Tokenizer` instance:
+        - "foldername/foldername_vocab.txt" -> self.vocab : `dict[int, bytes]`
+        - "foldername/foldername_merges.txt" -> self.merges : `dict[tuple[int, int], int]`
+        - "foldername/foldername_merges.txt" -> self.special_token_ids : `list[int]`
+        """
+        self.vocab = DataManager.vocab_load(folderpath)
+        self.merges = DataManager.merges_load(folderpath)
+        self.special_token_ids = DataManager.special_tok_ids_load(folderpath)
+
