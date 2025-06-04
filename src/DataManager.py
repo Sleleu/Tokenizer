@@ -1,4 +1,5 @@
 import os
+import ast
 
 class DataManager:
 
@@ -35,6 +36,7 @@ class DataManager:
 
         return "\n\n".join(texts)
 
+    # TODO: change save/load model logic
     # ==== SAVE MODEL METHODS ====
     @staticmethod
     def vocab_save(vocab: dict[int, bytes], folderpath: str, filename: str) -> None:
@@ -71,7 +73,11 @@ class DataManager:
         with open(filename, "r") as f:
             for line in f:
                 token_id, value = map(lambda x: x.strip('[]'), line.strip().split(" -> "))
-                vocab[int(token_id)] = bytes(value.encode("utf-8"))
+                if value.startswith("b'") and value.endswith("'"):
+                    value_bytes = ast.literal_eval(value)
+                    vocab[int(token_id)] = bytes(value_bytes)
+                else:
+                    vocab[int(token_id)] = value.encode("utf-8")
         return vocab
 
     @staticmethod

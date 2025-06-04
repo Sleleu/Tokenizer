@@ -114,3 +114,24 @@ def test_encode(
 
     result = tokenizer.encode(text)
     assert result == expected
+
+@pytest.mark.parametrize(
+    "param_tokens, expected",
+    [
+        ('', ''),
+        ([97], 'a'),
+        ([240, 159, 166, 144, 240, 159, 166, 144], '🦐🦐'),
+    ],
+)
+def test_decode(
+    param_tokens: list[int],
+    expected: str,
+):
+    tokenizer = Tokenizer()
+    with open ("src/Tokenizer.py", 'r') as f: 
+        text = f.read()
+    
+    tokenizer.train('abc')
+    tokens = tokenizer.encode("src/Tokenizer.py")
+    assert tokenizer.decode(tokens) == text
+    assert tokenizer.decode(param_tokens) == expected

@@ -2,6 +2,10 @@ import regex as re
 import os
 from src.DataManager import DataManager
 
+class TokenizerException(Exception):
+    def __init__(self, message: str):
+        print(message)
+
 class Tokenizer:
 
     def __init__(self, vocab={}, pattern=None):
@@ -116,6 +120,14 @@ class Tokenizer:
 
 
     def encode(self, text) -> list[int]:
+        try:
+            with open(text, "r") as f:
+                text = f.read()
+            assert self.vocab and self.merges
+        except FileNotFoundError:
+            pass # simple text, no error
+        except AssertionError:
+            raise TokenizerException("Tokenizer need to be train")
         tokens = list(text.encode("utf-8"))
         tokens = self.encode_special_tokens(tokens)
 
@@ -132,6 +144,8 @@ class Tokenizer:
         return tokens
 
     def decode(self, ids: list[int]) -> str:
+        if not self.vocab:
+            raise TokenizerException("Tokenizer need to be train")
         return b"".join(self.vocab[i] for i in ids).decode("utf-8", errors="replace")
     
     def save(self, folderpath: str) -> None:
@@ -156,4 +170,3 @@ class Tokenizer:
         self.vocab = DataManager.vocab_load(folderpath)
         self.merges = DataManager.merges_load(folderpath)
         self.special_token_ids = DataManager.special_tok_ids_load(folderpath)
-

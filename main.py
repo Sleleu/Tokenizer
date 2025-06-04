@@ -6,14 +6,12 @@ tokenizer = Tokenizer()
 # tokenizer.save("model/sleleu_20K")
 
 
-
-tokenizer.get_encoding("model/sleleu_20k")
-print(tokenizer.encode("<|endoftext|>anabc"))
-
+tokenizer.get_encoding("model/sleleu_20K")
 #print("merges:", tokenizer.merges)
 #print("ENCODE")
-tokens = tokenizer.encode("aaabdaaabac<|endoftext|><|im_start|>hi")
-print(tokens)
+#tokens = tokenizer.encode("aaabdaaabac<|endoftext|><|im_start|>hi")
+tokens = tokenizer.encode("yo")
+#print(tokens)
 #print("DECODE")
 string = tokenizer.decode(tokens)
 print(string)
